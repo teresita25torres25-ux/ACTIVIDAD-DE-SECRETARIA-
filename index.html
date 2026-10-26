@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juego de Emparejar: Instrumentación Musical</title>
+  <!-- Fuentes de Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+  <!-- Librería de Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  
+  <style>
+    :root {
+      --bg-color: #f0f4f8;
+      --primary: #8e44ad;
+      --primary-hover: #732d91;
+      --secondary: #00b894;
+      --accent: #fd79a8;
+      --card-bg: #ffffff;
+      --card-selected: #ffeaa7;
+      --card-matched: #55efc4;
+      --card-error: #ff7675;
+      --text-color: #2d3436;
+      --shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(135deg, #2c3e50 0%, #fd79a8 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: var(--text-color);
+    }
+
+    .container {
+      background: white;
+      border-radius: 24px;
+      padding: 30px;
+      width: 100%;
+      max-width: 900px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Fredoka', sans-serif;
+      color: var(--primary);
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    p.subtitle {
+      font-size: 1.1rem;
+      color: #636e72;
+      margin-bottom: 25px;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-around;
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 16px;
+      margin-bottom: 25px;
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-value {
+      color: var(--primary);
+      font-size: 1.5rem;
+    }
+
+    /* Grid layout */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 3px solid #dfe6e9;
+      border-radius: 16px;
+      padding: 20px 15px;
+      min-height: 110px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      user-select: none;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+      box-shadow: var(--shadow);
+    }
+
+    .card.selected {
+      background-color: var(--card-selected);
+      border-color: #fdcb6e;
+      transform: scale(1.05);
+    }
+
+    .card.matched {
+      background-color: var(--card-matched);
+      border-color: #00b894;
+      color: #006266;
+      cursor: default;
+      transform: scale(1);
+      opacity: 0.8;
+    }
+
+    .card.error {
+      background-color: var(--card-error);
+      border-color: #d63031;
+      color: white;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    .btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      box-shadow: 0 4px 10px rgba(142, 68, 173, 0.4);
+    }
+
+    .btn:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-2px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    /* Modal / Popup de victoria */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 100;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: white;
+      padding: 40px;
+      border-radius: 24px;
+      text-align: center;
+      max-width: 450px;
+      width: 90%;
+      transform: scale(0.8);
+      transition: transform 0.3s ease;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+    }
+
+    .modal-overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal h2 {
+      font-family: 'Fredoka', sans-serif;
+      color: var(--secondary);
+      font-size: 2.2rem;
+      margin-bottom: 15px;
+    }
+
+    .modal p {
+      font-size: 1.2rem;
+      margin-bottom: 25px;
+      color: #2d3436;
+    }
+
+    .trophy-icon {
+      font-size: 4rem;
+      margin-bottom: 15px;
+      display: inline-block;
+      animation: bounce 1s infinite alternate;
+    }
+
+    @keyframes bounce {
+      from { transform: translateY(0); }
+      to { transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- TÍTULO DEL JUEGO -->
+    <h1 id="game-title">Instrumentación Musical 🎵</h1>
+    <p class="subtitle">Haz clic en un instrumento musical o categoría y luego con su definición correspondiente.</p>
+
+    <!-- ESTADÍSTICAS -->
+    <div class="stats">
+      <div class="stat-box">
+        <span>Intentos</span>
+        <span id="moves" class="stat-value">0</span>
+      </div>
+      <div class="stat-box">
+        <span>Aciertos</span>
+        <span id="matches" class="stat-value">0 / 0</span>
+      </div>
+    </div>
+
+    <!-- TABLERO DEL JUEGO -->
+    <div id="game-grid" class="grid"></div>
+
+    <!-- BOTÓN DE REINICIO -->
+    <button class="btn" onclick="initGame()">Reiniciar Juego</button>
+  </div>
+
+  <!-- MODAL DE FELICITACIÓN -->
+  <div id="win-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="trophy-icon">🎻🎶</div>
+      <h2>¡Maestro de la Música!</h2>
+      <p id="win-message">¡Has emparejado todos los conceptos de instrumentación musical con éxito!</p>
+      <button class="btn" onclick="closeModalAndRestart()">Jugar de nuevo</button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // CONFIGURACIÓN DEL TEMA Y DATOS: INSTRUMENTACIÓN MUSICAL
+    // =========================================================================
+    const TEMA = "Instrumentación Musical 🎼";
+
+    const DATOS = [
+      { concepto: "Cuerda Frotada", definicion: "Familia a la que pertenecen el violín, la viola, el violonchelo y el contrabajo." },
+      { concepto: "Viento Madera", definicion: "Instrumentos como la flauta, el oboe, el clarinete y el fagot." },
+      { concepto: "Viento Metal", definicion: "Instrumentos de latón que usan boquilla, como la trompeta, el trombón y la tuba." },
+      { concepto: "Percusión Determinada", definicion: "Instrumentos de rítmica que producen notas de altura definida, como el xilófono o timbales." },
+      { concepto: "Percusión Indeterminada", definicion: "Instrumentos cuyo sonido no genera notas musicales concretas, como el bombo, caja o platillos." },
+      { concepto: "Electrófonos", definicion: "Instrumentos que requieren electricidad para producir sonido, como el sintetizador." }
+    ];
+
+    // =========================================================================
+    // LÓGICA DEL JUEGO
+    // =========================================================================
+    let selectedCards = [];
+    let moves = 0;
+    let matchedPairs = 0;
+    let totalPairs = DATOS.length;
+
+    // Elementos DOM
+    const gridElement = document.getElementById('game-grid');
+    const movesElement = document.getElementById('moves');
+    const matchesElement = document.getElementById('matches');
+    const titleElement = document.getElementById('game-title');
+    const winModal = document.getElementById('win-modal');
+    const winMessage = document.getElementById('win-message');
+
+    titleElement.textContent = TEMA;
+
+    // Algoritmo Fisher-Yates para mezclar
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // Inicializar el juego
+    function initGame() {
+      gridElement.innerHTML = '';
+      selectedCards = [];
+      moves = 0;
+      matchedPairs = 0;
+      
+      movesElement.textContent = moves;
+      matchesElement.textContent = `${matchedPairs} / ${totalPairs}`;
+
+      // Crear lista de elementos
+      let cardsData = [];
+      DATOS.forEach((pair, index) => {
+        cardsData.push({ id: index, text: pair.concepto, type: 'concepto' });
+        cardsData.push({ id: index, text: pair.definicion, type: 'definicion' });
+      });
+
+      // Mezclar tarjetas
+      cardsData = shuffle(cardsData);
+
+      // Renderizar tarjetas en el DOM
+      cardsData.forEach(item => {
+        const card = document.createElement('div');
+        card.classList.add('card');
+        card.dataset.id = item.id;
+        card.textContent = item.text;
+        
+        card.addEventListener('click', () => handleCardClick(card));
+        gridElement.appendChild(card);
+      });
+    }
+
+    // Manejar clics en las tarjetas
+    function handleCardClick(card) {
+      if (card.classList.contains('matched') || card.classList.contains('selected') || selectedCards.length >= 2) {
+        return;
+      }
+
+      card.classList.add('selected');
+      selectedCards.push(card);
+
+      if (selectedCards.length === 2) {
+        moves++;
+        movesElement.textContent = moves;
+        checkMatch();
+      }
+    }
+
+    // Comprobar coincidencia
+    function checkMatch() {
+      const [card1, card2] = selectedCards;
+      const isMatch = card1.dataset.id === card2.dataset.id;
+
+      if (isMatch) {
+        card1.classList.remove('selected');
+        card2.classList.remove('selected');
+        card1.classList.add('matched');
+        card2.classList.add('matched');
+
+        matchedPairs++;
+        matchesElement.textContent = `${matchedPairs} / ${totalPairs}`;
+        selectedCards = [];
+
+        if (matchedPairs === totalPairs) {
+          setTimeout(showWinModal, 500);
+        }
+      } else {
+        card1.classList.add('error');
+        card2.classList.add('error');
+
+        setTimeout(() => {
+          card1.classList.remove('selected', 'error');
+          card2.classList.remove('selected', 'error');
+          selectedCards = [];
+        }, 800);
+      }
+    }
+
+    // Mostrar modal y lluvia de confeti
+    function showWinModal() {
+      winMessage.textContent = `¡Completaste el tema de "Instrumentación Musical" en ${moves} intentos!`;
+      winModal.classList.add('active');
+      triggerConfetti();
+    }
+
+    function closeModalAndRestart() {
+      winModal.classList.remove('active');
+      initGame();
+    }
+
+    // Efecto de Confeti
+    function triggerConfetti() {
+      const duration = 3 * 1000;
+      const end = Date.now() + duration;
+
+      (function frame() {
+        confetti({
+          particleCount: 5,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 },
+          colors: ['#8e44ad', '#00b894', '#fd79a8', '#ffeaa7']
+        });
+        confetti({
+          particleCount: 5,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 },
+          colors: ['#8e44ad', '#00b894', '#fd79a8', '#ffeaa7']
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      })();
+    }
+
+    window.onload = initGame;
+  </script>
+</body>
+</html>
